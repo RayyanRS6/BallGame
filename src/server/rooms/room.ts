@@ -77,6 +77,8 @@ const STATS_REFRESH_MS = 5000;
 const SLOW_CLIENT_BYTES = 256 * 1024;
 /** If the process stalls longer than this, skip ticks instead of fast-forwarding. */
 const MAX_CATCH_UP_MS = 250;
+/** How often an empty persistent room checks in (it does not simulate while empty). */
+const IDLE_WAKE_MS = 250;
 
 function hashPassword(pw: string): Buffer {
   return createHash('sha256').update(pw, 'utf8').digest();
@@ -281,6 +283,7 @@ export class Room {
     this.members.set(id, member);
     if (!this.hostId && !this.autoStart) this.hostId = id;
     this.emptySince = 0;
+    this.wake();
 
     // Auto-balance (public drop-in rooms) or fill an empty slot in the lobby.
     const size = this.settings.match.teamSize;
@@ -416,6 +419,7 @@ export class Room {
       this.systemChat(`${m.name} reconnected`);
       this.rosterDirty = true;
       this.emptySince = 0;
+      this.wake();
       return m;
     }
     return null;
@@ -616,12 +620,30 @@ export class Room {
     return this.nextTickAt;
   }
 
+  /** Resume ticking immediately if the room was sleeping (idle persistent room). */
+  private wake(): void {
+    const now = this.deps.now();
+    if (this.nextTickAt > now + this.tickMs) {
+      this.nextTickAt = now;
+      this.epoch = now - this.sim.tick * this.tickMs;
+    }
+  }
+
+  /** Server time (ms) for snapshots of the current tick — exposed for tests. */
+  get currentServerTime(): number {
+    return this.serverTimeOfTick(this.sim.tick);
+  }
+
   /** Runs every tick that is due at `now`. */
   advance(now: number): void {
     if (this.destroyed) return;
     if (this.persistent && this.humanCount === 0 && this.members.size === 0) {
-      // Idle persistent room: sleep, but keep the clock aligned.
-      this.nextTickAt = now + this.tickMs;
+      // Idle persistent room: sleep. Re-anchor the epoch so the invariant
+      // nextTickAt = epoch + tick·dt holds; otherwise snapshot timestamps would
+      // lag real time after an idle period and clients would extrapolate
+      // instead of interpolating.
+      this.nextTickAt = now + IDLE_WAKE_MS;
+      this.epoch = this.nextTickAt - this.sim.tick * this.tickMs;
       return;
     }
     if (now - this.nextTickAt > MAX_CATCH_UP_MS) {

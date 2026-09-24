@@ -1,5 +1,14 @@
 # Render blueprint for the Momentum game server (WebSockets supported).
 # Render → New → Blueprint → select this repository.
+#
+# Latency notes:
+#  - The free plan has 0.1 vCPU and sleeps after 15 min idle. Under load the
+#    process gets CPU-throttled, which adds ping spikes for every player. Use
+#    at least "starter" for real matches (logs show `server_stalling` when the
+#    instance is too small).
+#  - Render only offers Oregon, Ohio, Virginia, Frankfurt and Singapore, and
+#    always routes through Cloudflare. Players in Pakistan / the Gulf get much
+#    lower ping from a VPS in the UAE (see docs/DEPLOYMENT.md → Reducing latency).
 services:
   - type: web
     name: momentum-server

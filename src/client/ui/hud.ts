@@ -8,6 +8,8 @@ export interface NetHud {
   jitter: number;
   loss: number;
   status: 'connected' | 'reconnecting' | 'offline';
+  /** Artificial latency added by the developer network simulator (0 = off). */
+  simulatedMs: number;
 }
 
 export function formatClock(seconds: number): string {
@@ -95,9 +97,10 @@ export class Hud {
 
     if (net) {
       this.net.style.display = '';
-      const text = net.status === 'reconnecting' ? 'Reconnecting…' : `${Math.round(net.ping)} ms  ±${Math.round(net.jitter)}  ${(net.loss * 100).toFixed(1)}%`;
+      let text = net.status === 'reconnecting' ? 'Reconnecting…' : `${Math.round(net.ping)} ms  ±${Math.round(net.jitter)}  ${(net.loss * 100).toFixed(1)}%`;
+      if (net.simulatedMs > 0) text += `  · SIMULATED LAG +${net.simulatedMs} ms (Settings → Network)`;
       setText(this.netText, text);
-      const cls = net.status !== 'connected' ? 'bad' : net.ping < 80 && net.loss < 0.02 ? 'good' : net.ping < 160 && net.loss < 0.06 ? 'ok' : 'bad';
+      const cls = net.status !== 'connected' || net.simulatedMs > 0 ? 'bad' : net.ping < 80 && net.loss < 0.02 ? 'good' : net.ping < 160 && net.loss < 0.06 ? 'ok' : 'bad';
       if (this.netDot.className !== `net-dot ${cls}`) this.netDot.className = `net-dot ${cls}`;
     } else this.net.style.display = 'none';
 

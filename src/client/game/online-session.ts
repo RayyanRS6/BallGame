@@ -398,7 +398,13 @@ export class OnlineSession implements GameSession {
     frame.tickRate = this.room.settings.tickRate;
     frame.focusId = this.playerId;
     frame.localTeam = this.myTeam;
-    frame.net = { ping: this.net.clock.srtt, jitter: this.net.clock.jitter, loss: this.net.stats.loss, status: this.status };
+    frame.net = {
+      ping: this.net.clock.srtt,
+      jitter: this.net.clock.jitter,
+      loss: this.net.stats.loss,
+      status: this.status,
+      simulatedMs: s.simEnabled ? s.simLatency : 0,
+    };
     frame.hudSub = this.myTeam === TEAM_SPECTATOR ? 'SPECTATING' : '';
     frame.debug.world = settings.get().debug.overlay ? sim.world : null;
     frame.debug.ghosts.length = 0;

@@ -202,7 +202,7 @@ function tabContent(tab: Tab): HTMLElement {
         field('Ball', select([{ value: 'predict', label: 'Predict (responsive touches)' }, { value: 'interpolate', label: 'Interpolate (never corrects)' }] as const, s.network.ballMode, (v) => upd((x) => (x.network.ballMode = v)))),
         h('label', { class: 'check-row' }, checkbox(s.network.showNetStats, (v) => upd((x) => (x.network.showNetStats = v))), ' Show ping / jitter / packet loss in game'),
         h('div', { class: 'card-title' }, 'Network simulator (testing)'),
-        h('label', { class: 'check-row' }, checkbox(s.network.simEnabled, (v) => upd((x) => (x.network.simEnabled = v))), ' Simulate network conditions'),
+        h('label', { class: 'check-row' }, checkbox(s.network.simEnabled, (v) => upd((x) => (x.network.simEnabled = v))), ' Simulate network conditions (adds fake lag — keep OFF for real games)'),
         field('Added round-trip latency', slider(s.network.simLatency, 0, 400, 5, (v) => upd((x) => (x.network.simLatency = v)), (v) => `${v} ms`)),
         field('Jitter', slider(s.network.simJitter, 0, 100, 1, (v) => upd((x) => (x.network.simJitter = v)), (v) => `±${v} ms`)),
         field('Packet loss (inputs/snapshots)', slider(s.network.simLoss, 0, 20, 0.5, (v) => upd((x) => (x.network.simLoss = v)), (v) => `${v}%`)),

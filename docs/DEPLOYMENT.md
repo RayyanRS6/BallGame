@@ -56,6 +56,58 @@ Without `VITE_SERVERS` the client assumes its own origin is the game server; on 
 no server, so the menu reports "No game server reachable" and only the offline modes (local match,
 training, replays) are available. With `VITE_SERVERS` set, the page's own origin is not probed.
 
+## One-command server in the UAE (best for Pakistan and the Gulf)
+
+1. Create an **Ubuntu 22.04 or 24.04** VM in a UAE region, with at least 1 full vCPU:
+   Oracle Cloud *UAE East (Dubai)* / *UAE Central (Abu Dhabi)* (Always Free Ampere VM if you pick a
+   UAE home region at sign-up), AWS `me-central-1`, or Azure *UAE North*.
+2. In the provider's firewall / security list, allow inbound **TCP 22, 80 and 443**.
+3. SSH in and run:
+
+   ```bash
+   sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/RayyanRS6/BallGame/main/deploy/setup-vps.sh)"
+   ```
+
+   It installs Node 24, Caddy (free automatic HTTPS) and the game service, and prints the server
+   address — `https://<your-ip-with-dashes>.sslip.io` unless you pass `DOMAIN=your.domain`.
+4. Play at that address directly, or set `VITE_SERVERS=https://<that address>` in Vercel and
+   redeploy. You can keep the Render server in the list too; the server browser shows each
+   player's ping to both.
+
+Re-run the same command on the VPS to update the game to the latest commit.
+
+## Reducing latency
+
+Ping is almost entirely decided by **where the server runs** and **whether it gets enough CPU**.
+The game's own overhead is small: the local player is predicted (moves instantly) and the server
+answers pings the moment they arrive.
+
+1. **Put the server close to the players — measure, don't guess.** Routing is not geographic.
+   Measured from Karachi (Sept 2026): UAE ≈ 55 ms, Singapore ≈ 105–120 ms, Frankfurt ≈ 150 ms,
+   Mumbai/Delhi 120–260 ms (Pakistan↔India traffic often detours abroad). Each player can check
+   their own numbers at <https://www.cloudping.info> (AWS regions); choose the region that keeps the
+   *worst* player's ping lowest. For Pakistan and the Gulf that is usually the UAE:
+   AWS `me-central-1` (UAE), Azure UAE North (Dubai), Google Cloud `me-central1` (Doha) or
+   Oracle Cloud Dubai / Abu Dhabi (its Always Free VM can use a UAE home region).
+2. **Give it a real CPU.** A fractional vCPU (e.g. Render free = 0.1 vCPU) gets throttled: the
+   process is frozen for tens of milliseconds at a time, adding lag spikes for everyone. The server
+   logs `server_stalling` and reports `loopLateAvgMs` / `loopLateMaxMs` in `/api/metrics` when that
+   happens. One full vCPU runs many rooms comfortably.
+3. **Connect directly.** Hosts that force traffic through a CDN proxy (Render routes everything via
+   Cloudflare) add an extra hop between the player's edge and the server. A VPS with its own
+   domain + TLS (nginx/Caddy, see above) avoids that.
+4. **Several regions for mixed groups.** Run one server per region and list them all in
+   `VITE_SERVERS`; the server browser shows each player's measured ping to every region. All
+   players in one match must share one server, so pick the region that is fair for the group.
+5. **Client settings.** Keep Settings → Network → *Simulate network conditions* **off** — it adds
+   artificial lag for testing, and the HUD warns while it is on.
+
+To measure a deployment from your own machine:
+
+```bash
+curl -s -o /dev/null -w "%{time_connect}s connect, %{time_starttransfer}s first byte\n" https://your-server/api/ping
+```
+
 ## Environment variables
 
 | Variable | Default | Purpose |

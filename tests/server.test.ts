@@ -117,6 +117,21 @@ describe('rooms', () => {
   });
 });
 
+describe('timing', () => {
+  test('snapshot timestamps stay aligned with real time after a persistent room idles', () => {
+    const h = new Harness();
+    const room = h.manager.createRoom({ name: 'Arena' }, { persistent: true, autoStart: true })!;
+    h.advance(10_000); // nobody there: the room sleeps
+    const c = h.connect('Late', undefined, 5);
+    h.advance(5);
+    c.send({ t: 'join', code: room.code });
+    h.advance(500);
+    const snap = c.lastSnapshot!;
+    assert.ok(snap, 'snapshots flowing');
+    assert.ok(Math.abs(snap.serverTime - h.now) < 40, `serverTime ${snap.serverTime.toFixed(1)} vs now ${h.now}`);
+  });
+});
+
 describe('reconnection', () => {
   test('a dropped player can reconnect and keeps identity and team', () => {
     const h = new Harness();

@@ -120,16 +120,23 @@ function onConnection(ws: WebSocket, ip: string): void {
 // ---------------------------------------------------------------- tick loop
 
 /**
- * Fixed-rate scheduler. Each room keeps its own tick deadline; the loop wakes
- * up shortly before the earliest one. Ticks are never skipped under normal
- * load; after a long stall the room drops the backlog instead of spiralling.
+ * Fixed-rate scheduler. Each room keeps its own tick deadline; the loop sleeps
+ * until the earliest one and runs every tick that is due. It never busy-waits:
+ * on fractional-vCPU cloud instances spinning burns the CPU quota and the OS
+ * then freezes the whole process for tens of milliseconds, which players feel
+ * as high ping and bursty snapshots. Waking ~1 ms late is harmless because
+ * snapshot timestamps use the ideal tick time (epoch + tick · dt).
  */
+let lastLoopAt = now();
 function loop(): void {
-  manager.advance(now());
-  const wait = manager.nextDue() - now();
-  if (!Number.isFinite(wait)) setTimeout(loop, 50);
-  else if (wait > 2) setTimeout(loop, Math.floor(wait - 1));
-  else setImmediate(loop);
+  const t = now();
+  metrics.recordLoopLateness(Math.max(0, t - lastLoopAt));
+  manager.advance(t);
+  const next = manager.nextDue();
+  const wait = Number.isFinite(next) ? Math.ceil(next - now()) : 50;
+  const delay = Math.max(1, Math.min(50, wait));
+  lastLoopAt = now() + delay;
+  setTimeout(loop, delay);
 }
 loop();
 
@@ -139,6 +146,18 @@ setInterval(() => {
   manager.sweep(t);
   for (const s of sessions) if (t - s.lastActivity > 30_000) s.close(4001, 'Idle timeout');
 }, 5000).unref();
+
+// Warn when the process is being starved of CPU (visible in the host's logs).
+setInterval(() => {
+  const { stalls, maxLateMs } = metrics.takeStalls();
+  if (stalls >= 5 && manager.playerCount > 0) {
+    logger.warn('server_stalling', {
+      stalls,
+      maxLateMs,
+      hint: 'The tick loop is being delayed — the instance is CPU-starved or overloaded. Players will see extra ping. Use a larger instance.',
+    });
+  }
+}, 30_000).unref();
 
 if (config.metricsLogIntervalSec > 0) {
   setInterval(() => logger.info('metrics', metrics.report({ rooms: manager.rooms.size, players: manager.playerCount })), config.metricsLogIntervalSec * 1000).unref();
