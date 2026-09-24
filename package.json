@@ -1,0 +1,29 @@
+{
+  "name": "momentum-football",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Momentum — a deterministic, server-authoritative 2D physics football game for the browser.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.ts",
+    "server": "node src/server/main.ts",
+    "client": "vite",
+    "build": "vite build",
+    "start": "node src/server/main.ts",
+    "test": "node --test --test-reporter=spec \"tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0"
+  }
+}

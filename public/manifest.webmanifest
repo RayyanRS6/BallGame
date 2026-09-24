@@ -1,0 +1,10 @@
+{
+  "name": "Momentum Football",
+  "short_name": "Momentum",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

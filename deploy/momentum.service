@@ -1,0 +1,27 @@
+# systemd unit — copy to /etc/systemd/system/momentum.service
+[Unit]
+Description=Momentum football game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=momentum
+WorkingDirectory=/opt/momentum
+EnvironmentFile=/opt/momentum/.env
+ExecStart=/usr/bin/node src/server/main.ts
+Restart=always
+RestartSec=2
+# Graceful shutdown: rooms are closed and clients told "Server restarting".
+KillSignal=SIGTERM
+TimeoutStopSec=5
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/momentum
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
