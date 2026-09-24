@@ -38,6 +38,24 @@ docker run -d --name momentum --restart=always -p 8787:8787 --env-file .env mome
 
 The image runs the test suite during the build and has a `/healthz` health check.
 
+## Static client on Vercel / Netlify + separate game server
+
+Vercel (and similar static/serverless hosts) can serve the **client**, but cannot run the game
+**server**: it needs a long-lived process with WebSockets and a 60 Hz tick loop. Split the two:
+
+1. **Client on Vercel** — `vercel.json` in the repo sets the build (`npm run build`) and the output
+   directory (`dist/client`). Without it Vercel serves `dist/` and every page is a 404.
+2. **Server anywhere that keeps a process running with WebSockets** — a VPS (see below), Docker host,
+   Render (`render.yaml` blueprint included), Railway or Fly.io. It must be reachable over **HTTPS**,
+   because a page served over `https://` may only open `wss://` connections.
+3. In Vercel → Project → Settings → Environment Variables add
+   `VITE_SERVERS=https://your-game-server.example.com` (comma-separate several regions) and redeploy.
+   The variable is baked in at build time.
+
+Without `VITE_SERVERS` the client assumes its own origin is the game server; on Vercel that finds
+no server, so the menu reports "No game server reachable" and only the offline modes (local match,
+training, replays) are available. With `VITE_SERVERS` set, the page's own origin is not probed.
+
 ## Environment variables
 
 | Variable | Default | Purpose |
@@ -71,11 +89,11 @@ Latency matters more than anything else in this game, so run one server per regi
 (for example Karachi/Lahore for Pakistan, Mumbai for India, Dubai/Bahrain for the Middle East,
 Singapore, Frankfurt, Virginia). Nothing is tied to a provider: any VPS with a public IP works.
 
-Clients discover servers from three sources, merged and measured by real ping:
+Clients discover servers from these sources, merged and measured by real ping:
 
-1. the origin that served the page;
-2. `VITE_SERVERS` at build time, e.g.
+1. `VITE_SERVERS` at build time, e.g.
    `VITE_SERVERS="https://sg.example.com,https://eu.example.com" npm run build`;
+2. otherwise, the origin that served the page;
 3. servers each player adds in **Settings → Network** or in the server browser.
 
 `GET /api/info`, `/api/rooms` and `/api/ping` send `Access-Control-Allow-Origin: *`, so a client

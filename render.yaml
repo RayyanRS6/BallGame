@@ -1,0 +1,22 @@
+# Render blueprint for the Momentum game server (WebSockets supported).
+# Render → New → Blueprint → select this repository.
+services:
+  - type: web
+    name: momentum-server
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node src/server/main.ts
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: SERVER_NAME
+        value: Momentum Server
+      - key: SERVER_REGION
+        value: Singapore
+      - key: TRUST_PROXY
+        value: "true"
+      - key: LOG_FORMAT
+        value: json

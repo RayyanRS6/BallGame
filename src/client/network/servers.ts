@@ -35,14 +35,19 @@ export function wsUrl(base: string): string {
   return u.toString();
 }
 
-/** Same-origin server, build-time list (VITE_SERVERS) and user-added servers. */
+/**
+ * Build-time list (VITE_SERVERS) and user-added servers. The page's own origin
+ * is only assumed to be a game server when VITE_SERVERS is not set — static
+ * hosts such as Vercel or Netlify serve the client but cannot run the server.
+ */
 export function knownServers(): string[] {
-  const list: string[] = [location.origin];
+  const list: string[] = [];
   const env = (import.meta.env?.VITE_SERVERS as string | undefined) ?? '';
   for (const s of env.split(',')) {
     const n = normalizeServerUrl(s);
     if (n) list.push(n);
   }
+  if (list.length === 0) list.push(location.origin);
   for (const s of settings.get().network.servers) {
     const n = normalizeServerUrl(s);
     if (n) list.push(n);
@@ -54,17 +59,25 @@ async function timedFetch(url: string, timeoutMs: number): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    return await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res;
   } finally {
     clearTimeout(t);
   }
+}
+
+async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
+  const res = await timedFetch(url, timeoutMs);
+  if (!(res.headers.get('content-type') ?? '').includes('json')) throw new Error('not a game server');
+  return (await res.json()) as T;
 }
 
 /** Measures ping (best of 3 HTTP round trips) and fetches info + public rooms. */
 export async function probeServer(url: string, timeoutMs = 3000): Promise<ServerEntry> {
   const entry: ServerEntry = { url, name: url, region: '?', online: false, ping: null, players: 0, rooms: [], error: '' };
   try {
-    const info = (await (await timedFetch(`${url}/api/info`, timeoutMs)).json()) as { name: string; region: string; players: number };
+    const info = await fetchJson<{ name: string; region: string; players: number }>(`${url}/api/info`, timeoutMs);
     entry.name = info.name;
     entry.region = info.region;
     entry.players = info.players;
@@ -75,11 +88,12 @@ export async function probeServer(url: string, timeoutMs = 3000): Promise<Server
       best = Math.min(best, performance.now() - t0);
     }
     entry.ping = Math.round(best);
-    const rooms = (await (await timedFetch(`${url}/api/rooms`, timeoutMs)).json()) as { rooms: RoomListing[] };
+    const rooms = await fetchJson<{ rooms: RoomListing[] }>(`${url}/api/rooms`, timeoutMs);
     entry.rooms = rooms.rooms;
     entry.online = true;
   } catch (e) {
-    entry.error = (e as Error).name === 'AbortError' ? 'timeout' : 'unreachable';
+    const err = e as Error;
+    entry.error = err.name === 'AbortError' ? 'timeout' : err.message === 'not a game server' ? 'not a game server' : 'unreachable';
   }
   return entry;
 }
